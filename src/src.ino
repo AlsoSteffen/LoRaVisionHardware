@@ -28,7 +28,7 @@
 #define mobileTerminal 5
 
 //Defining the interval for the reset of the navigation system and mobile terminal
-#define resetInterval 5000
+#define resetInterval 1000
 
 // Creating a oneWire instance(object)
 OneWire oneWire(ONE_WIRE_BUS);
