@@ -16,3 +16,6 @@ Within this phase the team used thier knowledge acquired from the research phase
 ### Visualization
 
 ![Visualization of the circuit](images/Schematic_with_32u4II_II.png)
+
+### References
+https://learn.adafruit.com/adafruit-feather-32u4-bluefruit-le/setup
