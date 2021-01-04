@@ -41,5 +41,11 @@ http://www.arduino.cc/en/Main/Software
 
 After you have downloaded and installed the latest version of Arduino IDE, you will need to start the IDE and navigate to the Preferences menu. You can access it from the File menu in Windows or Linux, or the Arduino menu on OS X.
 
+![Preferences Arduino IDE](images/Preferences.png)
+
+A dialog will pop up just like the one shown below.
+
+![Preferences Popup Arduino IDE](images/PreferencesPopup.png)
+
 ### References
 https://learn.adafruit.com/adafruit-feather-32u4-bluefruit-le/setup
