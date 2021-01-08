@@ -8,7 +8,6 @@
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
-#include <ArduinoUniqueID.h>
 
 // All DS18B20 Sensors are connected to pin 1 on the LoRa32u4II board
 #define ONE_WIRE_BUS 2
@@ -56,6 +55,7 @@ DeviceAddress tempDeviceAddress;
 // replace FILLMEIN according to the documentation
 uint8_t interior[8] = { 0x28, 0xFF, 0x7E, 0xC7, 0xC0, 0x17, 0x05, 0xD6 };
 uint8_t battery[8] = { 0x28, 0xFF, 0xCD, 0xC2, 0xC0, 0x17, 0x05, 0x56 };
+uint16_t deviceID = 23;
 
 static const u1_t PROGMEM APPEUI[8]={ 0x94, 0x91, 0x03, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
@@ -70,7 +70,7 @@ void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 static const u1_t PROGMEM APPKEY[16] = { 0x9A, 0xC4, 0x20, 0xA4, 0x9A, 0x40, 0xCA, 0x84, 0x87, 0x52, 0xAE, 0xA8, 0xB2, 0xA0, 0x0B, 0x87 };
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
-uint8_t payload[16];
+uint8_t payload[8];
 
 static osjob_t sendjob;
 
@@ -87,7 +87,7 @@ const lmic_pinmap lmic_pins = {
 };
 
 void setup() {
-  Serial.begin(9600);
+  
   sensors.begin();
 
   pinMode(navigationSystem, OUTPUT);
@@ -115,25 +115,8 @@ void loop() {
 
 // function to create a payload to send to the things network
 uint8_t getPayload() {
-  int id0 = UniqueID[0];
-  int id1 = UniqueID[1];
-  int id2 = UniqueID[2];
-  int id3 = UniqueID[3];
-  int id4 = UniqueID[4];
-  int id5 = UniqueID[5];
-  int id6 = UniqueID[6];
-  int id7 = UniqueID[7];
-  int id8 = UniqueID[8];
   
-  payload[0] = id0;
-  payload[1] = id1;
-  payload[2] = id2;
-  payload[3] = id3;
-  payload[4] = id4;
-  payload[5] = id5;
-  payload[6] = id6;
-  payload[7] = id7;
-  payload[8] = id8;
+  payload[0] = deviceID;
   
   float interiorTemp = getTemperature(interior);
   interiorTemp = interiorTemp / 100;
@@ -147,22 +130,22 @@ uint8_t getPayload() {
   byte interiorTempLow = lowByte(payloadInteriorTemp);
   byte interiorTempHigh = highByte(payloadInteriorTemp);
   // place the bytes into the payload
-  payload[9] = interiorTempLow;
-  payload[10] = interiorTempHigh;
+  payload[1] = interiorTempLow;
+  payload[2] = interiorTempHigh;
 
   uint16_t payloadBatteryTemp = LMIC_f2sflt16(batteryTemp);
   // int -> bytes
   byte batteryTempLow = lowByte(payloadBatteryTemp);
   byte batteryTempHigh = highByte(payloadBatteryTemp);
-  payload[11] = batteryTempLow;
-  payload[12] = batteryTempHigh;
+  payload[3] = batteryTempLow;
+  payload[4] = batteryTempHigh;
 
   uint16_t payloadVoltage = LMIC_f2sflt16(voltage);
   // int -> bytes
   byte voltageLow = lowByte(payloadVoltage);
   byte voltageHigh = highByte(payloadVoltage);
-  payload[13] = voltageLow;
-  payload[14] = voltageHigh;
+  payload[5] = voltageLow;
+  payload[6] = voltageHigh;
 
   return payload;
 }
@@ -170,6 +153,7 @@ uint8_t getPayload() {
 // function to get data from the temperature sensors 
 double getTemperature(DeviceAddress deviceAddress) {
   
+  sensors.requestTemperatures();
   float tempC = sensors.getTempC(deviceAddress);
   return tempC;
 }
