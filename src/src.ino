@@ -5,6 +5,10 @@
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <lmic.h>
+#include <hal/hal.h>
+#include <SPI.h>
+#include <ArduinoUniqueID.h>
 
 // All DS18B20 Sensors are connected to pin 1 on the LoRa32u4II board
 #define ONE_WIRE_BUS 2
@@ -42,149 +46,202 @@ int numberOfDevices;
 //To store data from the voltage divider circuit
 int sensorValue;
 
+//Setting the devices to be zero by default
+int deviceCount = 0;
+
 // Variable to store a single sensor address
 DeviceAddress tempDeviceAddress; 
 
+// Addresses of the DS18B20 sensors
+// replace FILLMEIN according to the documentation
+uint8_t interior[8] = { 0x28, 0xFF, 0x7E, 0xC7, 0xC0, 0x17, 0x05, 0xD6 };
+uint8_t battery[8] = { 0x28, 0xFF, 0xCD, 0xC2, 0xC0, 0x17, 0x05, 0x56 };
+
+static const u1_t PROGMEM APPEUI[8]={ 0x94, 0x91, 0x03, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+
+// This should also be in little endian format, see above.
+static const u1_t PROGMEM DEVEUI[8]={ 0x5B, 0x0F, 0xF3, 0xDB, 0x47, 0x4E, 0x1F, 0x00 };
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
+
+// This key should be in big endian format (or, since it is not really a
+// number but a block of memory, endianness does not really apply). In
+// practice, a key taken from ttnctl can be copied as-is.
+static const u1_t PROGMEM APPKEY[16] = { 0x9A, 0xC4, 0x20, 0xA4, 0x9A, 0x40, 0xCA, 0x84, 0x87, 0x52, 0xAE, 0xA8, 0xB2, 0xA0, 0x0B, 0x87 };
+void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
+
+uint8_t payload[16];
+
+static osjob_t sendjob;
+
+// Schedule TX every this many seconds (might become longer due to duty
+// cycle limitations).
+const unsigned TX_INTERVAL = 30;
+
+// Pin mapping
+const lmic_pinmap lmic_pins = {
+    .nss = 8,
+    .rxtx = LMIC_UNUSED_PIN,
+    .rst = 4,
+    .dio = {7, 6, LMIC_UNUSED_PIN},
+};
+
 void setup() {
- 
   Serial.begin(9600);
   sensors.begin();
-  
-  // calling the function temperatureSensorSetup
-  temperatureSensorSetup();
 
   pinMode(navigationSystem, OUTPUT);
   pinMode(mobileTerminal, OUTPUT);
-  
+  delay(1000);
+
+  // LMIC init
+  os_init();
+  // Reset the MAC state. Session and pending data transfers will be discarded.
+  LMIC_reset();
+
+  // ### Relax LMIC timing ###
+  // Required for ATmega328/ATmega32U4 (8MHz) otherwise OTAA joins on SF7 and SF8 will likely fail.
+  #define LMIC_CLOCK_ERROR_PERCENTAGE 3
+  LMIC_setClockError(LMIC_CLOCK_ERROR_PERCENTAGE * (MAX_CLOCK_ERROR / 100.0));
+
+  // Start job (sending automatically starts OTAA too)
+  do_send(&sendjob);
 }
 
 void loop() { 
   
-  // calling the function getTemperature
-  getTemperature();
-
-  // calling the function getBatteryVoltage
-  getBatteryVoltage();
-
-  // calling the function restartMobileTerminal
-  restartMobileTerminal();
-
-  // calling the function restartNavigationSystem
-  restartNavigationSystem();
+  os_runloop_once();
 }
 
-// function to setup the temperature sensors
-void temperatureSensorSetup() {
-  while(!Serial)
-  // Get the number of sensors connected to the the wire( digital pin 1)
-  numberOfDevices = sensors.getDeviceCount();
+// function to create a payload to send to the things network
+uint8_t getPayload() {
+  int id0 = UniqueID[0];
+  int id1 = UniqueID[1];
+  int id2 = UniqueID[2];
+  int id3 = UniqueID[3];
+  int id4 = UniqueID[4];
+  int id5 = UniqueID[5];
+  int id6 = UniqueID[6];
+  int id7 = UniqueID[7];
+  int id8 = UniqueID[8];
   
-  Serial.print(numberOfDevices, DEC);
-  Serial.println(" temperature devices.");
+  payload[0] = id0;
+  payload[1] = id1;
+  payload[2] = id2;
+  payload[3] = id3;
+  payload[4] = id4;
+  payload[5] = id5;
+  payload[6] = id6;
+  payload[7] = id7;
+  payload[8] = id8;
+  
+  float interiorTemp = getTemperature(interior);
+  interiorTemp = interiorTemp / 100;
+  float batteryTemp = getTemperature(battery);
+  batteryTemp = batteryTemp / 100;
+  float voltage = getBatteryVoltage();
+  voltage = voltage / 100;
 
-  // Loop through each sensor and print out address
-  for(int i=0; i<numberOfDevices; i++) {
-    
-    // Search the data wire for address and store the address in "tempDeviceAddress" variable
-    if(sensors.getAddress(tempDeviceAddress, i)) {
-      
-      Serial.print("Found device ");
-      Serial.print(i, DEC);
-      Serial.print(" with address: ");
-      printAddress(tempDeviceAddress);
-      Serial.println();
-      
-    } else {
-      
-      Serial.print("Found ghost device at ");
-      Serial.print(i, DEC);
-      Serial.print(" but could not detect address. Check power and cabling");
-      
-    }
-    
-  }
-  
+  uint16_t payloadInteriorTemp = LMIC_f2sflt16(interiorTemp);
+  // int -> bytes
+  byte interiorTempLow = lowByte(payloadInteriorTemp);
+  byte interiorTempHigh = highByte(payloadInteriorTemp);
+  // place the bytes into the payload
+  payload[9] = interiorTempLow;
+  payload[10] = interiorTempHigh;
+
+  uint16_t payloadBatteryTemp = LMIC_f2sflt16(batteryTemp);
+  // int -> bytes
+  byte batteryTempLow = lowByte(payloadBatteryTemp);
+  byte batteryTempHigh = highByte(payloadBatteryTemp);
+  payload[11] = batteryTempLow;
+  payload[12] = batteryTempHigh;
+
+  uint16_t payloadVoltage = LMIC_f2sflt16(voltage);
+  // int -> bytes
+  byte voltageLow = lowByte(payloadVoltage);
+  byte voltageHigh = highByte(payloadVoltage);
+  payload[13] = voltageLow;
+  payload[14] = voltageHigh;
+
+  return payload;
 }
 
 // function to get data from the temperature sensors 
-void getTemperature() {
+double getTemperature(DeviceAddress deviceAddress) {
   
-  sensors.requestTemperatures(); // Send the command to get temperatures from all sensors.
-  
-  // Loop through each device, print out temperature one by one
-  for(int i=0; i<numberOfDevices; i++) {
-    
-    // Search the wire for address and store the address in tempDeviceAddress
-    if(sensors.getAddress(tempDeviceAddress, i)){
-    
-      Serial.print("Temperature from sensor number: ");
-      Serial.println(i,DEC);
-      Serial.print("Temperature from sensor address: ");
-      printAddress(tempDeviceAddress);
-      Serial.println();
-      
-
-      // Print the temperature
-      float tempC = sensors.getTempC(tempDeviceAddress); //Temperature in degree celsius
-      Serial.print("Temp C: ");
-      Serial.println(tempC);
-
-    }   
-    
-  }
-  delay(1000);
-  
-}
-
-// function to print a sensor address
-void printAddress(DeviceAddress deviceAddress) {
-  
-  for (uint8_t i = 0; i < 8; i++) {
-    
-    if (deviceAddress[i] < 16) 
-      Serial.print("0");
-      Serial.print(deviceAddress[i], HEX);
-      
-  }
-  
+  float tempC = sensors.getTempC(deviceAddress);
+  return tempC;
 }
 
 // function to read the battery voltage
-void getBatteryVoltage() {
+double getBatteryVoltage() {
  
   sensorValue = analogRead(voltageDivider);
   float voltage = (sensorValue * (batteryVoltage / 1024.0)) * ((R1 + R2)/ R2);
-  // print out the value you read:
-  Serial.print("Battery voltage: ");
-  Serial.println(voltage);
-  delay(1000);
+  // return the value
+  return voltage;
   
 }
 
 // function to restart the navigation system
-void restartNavigationSystem(){
-
+void restartNavigationSystem() {
+  
   digitalWrite(navigationSystem, LOW);
-  Serial.print("Navigation system state: ");
-  Serial.println("ON");
   delay(resetInterval);    
   digitalWrite(navigationSystem, HIGH);
-  Serial.print("Navigation system state: ");
-  Serial.println("OFF");
   delay(resetInterval);
-  
 }
 
 // function to restart the mobile terminal
-void restartMobileTerminal(){
-
+void restartMobileTerminal() {
+  
   digitalWrite(mobileTerminal, LOW);
-  Serial.print("Mobile terminal state: ");
-  Serial.println("ON");
   delay(resetInterval);
   digitalWrite(mobileTerminal, HIGH);
-  Serial.print("Mobile terminal state: ");
-  Serial.println("OFF");
   delay(resetInterval);
-  
+}
+
+void onEvent (ev_t ev) {
+
+    switch(ev) {
+        case EV_JOINED:
+            // Disable link check validation (automatically enabled
+            // during join, but because slow data rates change max TX
+            // size, we don't use it in this example.
+            LMIC_setLinkCheckMode(0);
+            break;
+        case EV_TXCOMPLETE:
+            if (LMIC.txrxFlags & TXRX_ACK)
+            if (LMIC.dataLen) {
+              if (LMIC.dataLen == 1) {
+                uint8_t result = LMIC.frame[LMIC.dataBeg + 0];
+                if (result == 0)  {
+                  restartNavigationSystem();
+                  restartMobileTerminal();
+                }              
+                if (result == 1)  {
+                  restartNavigationSystem();
+                } 
+                if (result == 2)  {
+                  restartMobileTerminal();
+                }                                              
+              }
+            }
+            // Schedule next transmission
+            os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+            break;
+    }
+}
+
+void do_send(osjob_t* j){
+    // Check if there is not a current TX/RX job running
+    if (LMIC.opmode & OP_TXRXPEND) {
+    } else {
+        getPayload();
+
+        // Prepare upstream data transmission at the next possible time.
+        LMIC_setTxData2(1, payload, sizeof(payload)-1, 0);
+    }
+    // Next TX is scheduled after TX_COMPLETE event.
 }
