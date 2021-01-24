@@ -13,12 +13,15 @@ FILLMEIN
 
 ### Components
 From this assignment above the three individials derived a list of components which include: 
+- TTGO ESP32
 - DS18B20
 - Resistors
 - Buck Convertor
 - Relay
 
 Each component serves a different purpose as descibed in the chapters below
+
+### TTGO ESP32
 
 #### DS18B20
 
@@ -27,6 +30,7 @@ Each component serves a different purpose as descibed in the chapters below
 #### Buck Convertor
 
 #### Relay
+
 
 ## Design
 Within this phase the team used thier knowledge acquired from the research phase to create a visulaization of the circuit in order to ensure the smooth progression of the build phase.
