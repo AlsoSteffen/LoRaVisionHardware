@@ -32,7 +32,7 @@ Each component serves a different purpose as descibed in the chapters below
 Within this phase the team used thier knowledge acquired from the research phase to create a visulaization of the circuit in order to ensure the smooth progression of the build phase.
 
 ### Visualization
-![Schematic of the LoRaVision Project](images/LoRaVisionSchematic.png)
+![Schematic of the LoRaVision Project](images/TTGOESP32LORA.png)
 
 ## Arduino IDE Setup
 The first step you will need to do is to download the latest verison of the Arduino IDE (**Version 1.8 or higher**).
