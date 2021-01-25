@@ -12,19 +12,16 @@
 #include <U8x8lib.h>
 
 // All DS18B20 Sensors are connected to pin 1 on the LoRa32u4II board
-#define ONE_WIRE_BUS 2
+#define ONE_WIRE_BUS 22
 
 //Defining the value of R1 in the voltage divider circuit
-#define R1 33
+#define R1 3.0
 
 //Defining the value of R2 in the voltage divider circuit
 #define R2 300
 
 //Defining the pin that is used to read the battery voltage
-#define voltageDivider A0
-
-//Defining the battery voltage of the truck
-#define batteryVoltage 5.0
+#define voltageDivider 36
 
 //Defining the pin that is used to switch ON/OFF the navigation system
 #define navigationSystem 17
@@ -41,42 +38,32 @@ OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire object reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
 
-//To store number of sensor connected
-int numberOfDevices;
-
 //To store data from the voltage divider circuit
 int sensorValue;
-
-//Setting the devices to be zero by default
-int deviceCount = 0;
-
-// Variable to store a single sensor address
-DeviceAddress tempDeviceAddress;
 
 //Creating the display
 U8X8_SSD1306_128X64_NONAME_HW_I2C display(/*rst*/ 16, /*scl*/ 15, /*sda*/ 4);
 
 // Addresses of the DS18B20 sensors
-// replace FILLMEIN according to the documentation
-String interior[8];
-String battery[8];
+DeviceAddress interior = { FILLMEIN };
+DeviceAddress battery = { FILLMEIN };
 
 // This key should be in little endian format(lsb)
-static const u1_t PROGMEM APPEUI[8] = { 0x94, 0x91, 0x03, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+static const u1_t PROGMEM APPEUI[8] = { FILLMEIN };
 void os_getArtEui (u1_t* buf) 
 {
   memcpy_P(buf, APPEUI, 8);
 }
 
 // This key should be in little endian format(lsb)
-static const u1_t PROGMEM DEVEUI[8] = { 0x13, 0xBB, 0x9B, 0xA6, 0x39, 0xD5, 0xE4, 0x00 };
+static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN };
 void os_getDevEui (u1_t* buf) 
 {
   memcpy_P(buf, DEVEUI, 8);
 }
 
 // This key should be in big endian format(msb)
-static const u1_t PROGMEM APPKEY[16] = { 0xBC, 0x3C, 0xDB, 0x8B, 0x81, 0xE3, 0xF0, 0x60, 0xE7, 0xCE, 0x19, 0x96, 0x6E, 0xDD, 0xB7, 0xF3 };
+static const u1_t PROGMEM APPKEY[16] = { FILLMEIN };
 void os_getDevKey (u1_t* buf) 
 {
   memcpy_P(buf, APPKEY, 16);
@@ -87,7 +74,7 @@ byte payload[6];
 static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty cycle limitations).
-const unsigned TX_INTERVAL = 30;
+const unsigned TX_INTERVAL = 900;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = { 
@@ -124,9 +111,9 @@ void loop()
 // function to create a payload to send to the things network
 byte getPayload() 
 {
-    uint32_t interiorTemp = 12 * 100;
-    uint32_t batteryTemp = 24 * 100;
-    uint32_t battryVoltage = 11 * 100;
+    uint32_t interiorTemp = getTemperature(interior) * 100;
+    uint32_t batteryTemp = getTemperature(battery) * 100;
+    uint32_t battryVoltage = getBatteryVoltage() * 100;
 
     payload[0] = highByte(interiorTemp);
     payload[1] = lowByte(interiorTemp);
@@ -135,55 +122,6 @@ byte getPayload()
     payload[4] = highByte(battryVoltage);
     payload[5] = lowByte(battryVoltage);
 }
-
-// function to setup the temperature sensors
-//void temperatureSensorSetup() {
-//  while(!Serial)
-//  // locating devices
-//  deviceCount = sensors.getDeviceCount();
-//  
-//  for (int i = 0;  i < deviceCount;  i++)
-//  {
-//    sensors.getAddress(tempDeviceAddress, i);
-//    getDeviceAddress(tempDeviceAddress);
-//  }
-//}
-//
-//void getDeviceAddress(DeviceAddress deviceAddress) 
-//{
-//  if(interior == NULL) 
-//  {
-//    for (uint8_t i = 0; i < 8; i++)
-//    {
-//      interior[i] = "0x";
-//      if (deviceAddress[i] < 0x10) 
-//      {
-//        interior[i] = (interior[i] + "0");
-//      }
-//      interior[i] = (deviceAddress[i], HEX);
-//      if (i < 7) 
-//      {
-//        interior[i] = (interior[i] + ", ");
-//      }
-//    } 
-//  }
-//  else
-//  {
-//    for (uint8_t i = 0; i < 8; i++)
-//    {
-//      battery[i] = "0x";
-//      if (deviceAddress[i] < 0x10) 
-//      {
-//        battery[i] = (battery[i] + "0");
-//      }
-//      battery[i] = (deviceAddress[i], HEX);
-//      if (i < 7) 
-//      {
-//        battery[i] = (battery[i] + ", ");
-//      }
-//    } 
-//  }
-//}
 
 // function to get data from the temperature sensors
 double getTemperature(DeviceAddress deviceAddress) 
@@ -197,7 +135,7 @@ double getTemperature(DeviceAddress deviceAddress)
 double getBatteryVoltage() 
 {
   sensorValue = analogRead(voltageDivider);
-  float voltage = (sensorValue * (batteryVoltage / 1024.0)) * ((R1 + R2) / R2);
+  float voltage = (sensorValue * (R1 + R2) / R2)/100;
   
   // return the value
   return voltage;
@@ -339,7 +277,8 @@ void onEvent (ev_t ev)
     }
 }
 
-void do_send(osjob_t* j) {
+void do_send(osjob_t* j) 
+{
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) 
   {
