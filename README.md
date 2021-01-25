@@ -23,23 +23,33 @@ Each component serves a different purpose as descibed in the chapters below
 
 ### TTGO ESP32
 
+The esp32 is a micro-controller board that is used to receive data from the sensors, trigger relays and is also used to send sensor data to the backend, the action being taken (reset communication, navigation, or both) is also displayed on the board’s display for convenience.
+
 #### DS18B20
+
+The DS18B20 digital thermometer provides 9-bit to 12-bit Celsius temperature measurements and is used in conjunction to the esp32.
 
 #### Resistors
 
+The resistors used in the voltage divider circuit is used to lower the voltage of the car battery so it can be read by the esp32 without damaging the board.
+
 #### Buck Convertor
+
+The buck converter is used to power the esp32 board off the car battery so it can be a standalone system, it will provide the board with 3.3V.
 
 #### Relay
 
+The two separate relays used will be how the system resets the communication and navigation devices via a signal from the website.
+
 
 ## Design
-Within this phase the team used thier knowledge acquired from the research phase to create a visulaization of the circuit in order to ensure the smooth progression of the build phase.
+Within this phase the team used their knowledge acquired from the research phase to create a visualization of the circuit in order to ensure the smooth progression of the build phase.
 
 ### Visualization
 ![Schematic of the LoRaVision Project](images/TTGOESP32LORA.png)
 
 ## Arduino IDE Setup
-The first step you will need to do is to download the latest verison of the Arduino IDE (**Version 1.8 or higher**).
+The first step you will need to do is to download the latest version of the Arduino IDE (**Version 1.8 or higher**).
 You can download the Arduino IDE with the following link: http://www.arduino.cc/en/Main/Software
 
 After you have downloaded and installed the **latest version of Arduino IDE**, you will need to start the IDE and navigate to the **Preferences** menu. You can access it from the File menu in Windows or Linux, or the **Arduino** menu on OS X.
