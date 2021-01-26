@@ -11,14 +11,39 @@
 #include <U8g2lib.h>
 #include <U8x8lib.h>
 
+// Addresses of the DS18B20 sensors
+DeviceAddress interior = { FILLMEIN  };
+DeviceAddress battery = { FILLMEIN  };
+
+// This key should be in little endian format(lsb)
+static const u1_t PROGMEM APPEUI[8] = { FILLMEIN  };
+void os_getArtEui (u1_t* buf) 
+{
+  memcpy_P(buf, APPEUI, 8);
+}
+
+// This key should be in little endian format(lsb)
+static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN  };
+void os_getDevEui (u1_t* buf) 
+{
+  memcpy_P(buf, DEVEUI, 8);
+}
+
+// This key should be in big endian format(msb)
+static const u1_t PROGMEM APPKEY[16] = { FILLMEIN  };
+void os_getDevKey (u1_t* buf) 
+{
+  memcpy_P(buf, APPKEY, 16);
+}
+
 // All DS18B20 Sensors are connected to pin 1 on the LoRa32u4II board
 #define ONE_WIRE_BUS 22
 
 //Defining the value of R1 in the voltage divider circuit
-#define R1 3.0
+float R1 = 250000.0;
 
 //Defining the value of R2 in the voltage divider circuit
-#define R2 300
+float R2 = 30000.0;
 
 //Defining the pin that is used to read the battery voltage
 #define voltageDivider 36
@@ -44,37 +69,12 @@ int sensorValue;
 //Creating the display
 U8X8_SSD1306_128X64_NONAME_HW_I2C display(/*rst*/ 16, /*scl*/ 15, /*sda*/ 4);
 
-// Addresses of the DS18B20 sensors
-DeviceAddress interior = { FILLMEIN };
-DeviceAddress battery = { FILLMEIN };
-
-// This key should be in little endian format(lsb)
-static const u1_t PROGMEM APPEUI[8] = { FILLMEIN };
-void os_getArtEui (u1_t* buf) 
-{
-  memcpy_P(buf, APPEUI, 8);
-}
-
-// This key should be in little endian format(lsb)
-static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN };
-void os_getDevEui (u1_t* buf) 
-{
-  memcpy_P(buf, DEVEUI, 8);
-}
-
-// This key should be in big endian format(msb)
-static const u1_t PROGMEM APPKEY[16] = { FILLMEIN };
-void os_getDevKey (u1_t* buf) 
-{
-  memcpy_P(buf, APPKEY, 16);
-}
-
 byte payload[6];
 
 static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty cycle limitations).
-const unsigned TX_INTERVAL = 900;
+const unsigned TX_INTERVAL = 898.750;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = { 
@@ -86,6 +86,7 @@ const lmic_pinmap lmic_pins = {
 
 void setup() 
 {
+  
   sensors.begin();
   display.begin();
   display.setFont(u8x8_font_victoriamedium8_r);
@@ -135,11 +136,23 @@ double getTemperature(DeviceAddress deviceAddress)
 double getBatteryVoltage() 
 {
   sensorValue = analogRead(voltageDivider);
-  float voltage = (sensorValue * (R1 + R2) / R2)/100;
+  float voltage = (twoHundredAndFifty() * (R1 + R2))/(R2) ;
   
   // return the value
   return voltage;
 }
+
+float twoHundredAndFifty()
+{
+  int sumOfSensorValue = 0.0;
+  for(int i = 0; i < 250; i++)
+  {
+    sensorValue = analogRead(voltageDivider);
+    sumOfSensorValue += sensorValue;
+    delay(5);
+  }
+  return (sumOfSensorValue/250) * (3.3/3420);
+} 
 
 // function to restart the navigation system
 void restartNavigationSystem() 
