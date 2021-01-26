@@ -1,6 +1,6 @@
 /*********
    Name: Costandino Hiripis, Isaac Semackor and Christof Du Toit
-   Date: December 2, 2020 18:21PM
+   Date: January 26, 2020 20:00
 *********/
 
 #include <OneWire.h>
@@ -12,25 +12,25 @@
 #include <U8x8lib.h>
 
 // Addresses of the DS18B20 sensors
-DeviceAddress interior = { FILLMEIN  };
-DeviceAddress battery = { FILLMEIN  };
+DeviceAddress interior = { FILLMEIN };
+DeviceAddress battery = { FILLMEIN };
 
 // This key should be in little endian format(lsb)
-static const u1_t PROGMEM APPEUI[8] = { FILLMEIN  };
+static const u1_t PROGMEM APPEUI[8] = { FILLMEIN };
 void os_getArtEui (u1_t* buf) 
 {
   memcpy_P(buf, APPEUI, 8);
 }
 
 // This key should be in little endian format(lsb)
-static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN  };
+static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN };
 void os_getDevEui (u1_t* buf) 
 {
   memcpy_P(buf, DEVEUI, 8);
 }
 
 // This key should be in big endian format(msb)
-static const u1_t PROGMEM APPKEY[16] = { FILLMEIN  };
+static const u1_t PROGMEM APPKEY[16] = { FILLMEIN };
 void os_getDevKey (u1_t* buf) 
 {
   memcpy_P(buf, APPKEY, 16);
@@ -151,7 +151,7 @@ float twoHundredAndFifty()
     sumOfSensorValue += sensorValue;
     delay(5);
   }
-  return (sumOfSensorValue/250) * (3.3/3420);
+  return ((sumOfSensorValue/250) * (3.3/3420));
 } 
 
 // function to restart the navigation system
