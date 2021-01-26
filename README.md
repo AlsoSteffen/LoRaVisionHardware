@@ -42,7 +42,7 @@ The two separate relays used will be how the system resets the communication and
 Within this phase the team used their knowledge acquired from the research phase to create a visualization of the circuit in order to ensure the smooth progression of the build phase.
 
 ### Visualization
-![Schematic of the LoRaVision Project](images/TTGOLora32.png)
+![Schematic of the LoRaVision Project](images/TTGOESP32LORA.png)
 
 ## Arduino IDE Setup
 The first step you will need to do is to download the latest version of the Arduino IDE (**Version 1.8 or higher**).
