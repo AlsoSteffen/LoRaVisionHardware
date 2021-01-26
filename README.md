@@ -7,10 +7,6 @@ This project was split up into 3 subgroups one of them being hardware which is c
 
 These three individial worked as a team to design, build, code and document the assignment provided by Adri Wischmann.
 
-## Assignment
-FILLMEIN
-
-
 ### Components
 From this assignment above the three individials derived a list of components which include: 
 - TTGO ESP32
