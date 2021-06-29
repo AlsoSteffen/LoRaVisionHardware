@@ -1,6 +1,6 @@
 /*********
-   Name: Costandino Hiripis, Isaac Semackor and Christof Du Toit
-   Date: January 26, 2020 20:00
+   Name: Costandino Hiripis
+   Date: June 17, 2020 19:23
 *********/
 
 #include <OneWire.h>
@@ -40,10 +40,10 @@ void os_getDevKey (u1_t* buf)
 #define ONE_WIRE_BUS 22
 
 //Defining the value of R1 in the voltage divider circuit
-float R1 = 250000.0;
+float R1 = 330000.0;
 
 //Defining the value of R2 in the voltage divider circuit
-float R2 = 30000.0;
+float R2 = 47000.0;
 
 //Defining the pin that is used to read the battery voltage
 #define voltageDivider 36
@@ -66,7 +66,10 @@ DallasTemperature sensors(&oneWire);
 //To store data from the voltage divider circuit
 int sensorValue;
 
-//Creating the display
+//To store the downlink
+String HexDownlink = "";
+
+//Creating the display  
 U8X8_SSD1306_128X64_NONAME_HW_I2C display(/*rst*/ 16, /*scl*/ 15, /*sda*/ 4);
 
 byte payload[6];
@@ -86,15 +89,13 @@ const lmic_pinmap lmic_pins = {
 
 void setup() 
 {
-  
+  Serial.begin(9600);
   sensors.begin();
   display.begin();
   display.setFont(u8x8_font_victoriamedium8_r);
   
   pinMode(navigationSystem, OUTPUT);
   pinMode(mobileTerminal, OUTPUT);
-  digitalWrite(navigationSystem, HIGH);
-  digitalWrite(mobileTerminal, HIGH);
 
   // LMIC init
   os_init();
@@ -135,8 +136,8 @@ double getTemperature(DeviceAddress deviceAddress)
 // function to read the battery voltage
 double getBatteryVoltage() 
 {
-  sensorValue = analogRead(voltageDivider);
-  float voltage = (twoHundredAndFifty() * (R1 + R2))/(R2) ;
+  //Multiply the analog value by the number of millivolts per tick 
+  float voltage = twoHundredAndFifty() * 0.0063492063492063;
   
   // return the value
   return voltage;
@@ -151,25 +152,45 @@ float twoHundredAndFifty()
     sumOfSensorValue += sensorValue;
     delay(5);
   }
-  return ((sumOfSensorValue/250) * (3.3/3420));
+  return sumOfSensorValue/250;
 } 
 
 // function to restart the navigation system
 void restartNavigationSystem() 
 {
-  digitalWrite(navigationSystem, LOW);
-  delay(resetInterval);
   digitalWrite(navigationSystem, HIGH);
+  delay(resetInterval);
+  digitalWrite(navigationSystem, LOW);
   delay(resetInterval);
 }
 
 // function to restart the mobile terminal
 void restartMobileTerminal() 
 {
-  digitalWrite(mobileTerminal, LOW);
-  delay(resetInterval);
   digitalWrite(mobileTerminal, HIGH);
   delay(resetInterval);
+  digitalWrite(mobileTerminal, LOW);
+  delay(resetInterval);
+}
+
+// function to convert hex to decimal
+unsigned int hexToDec(String hexString) {
+
+  unsigned int decValue = 0;
+  int nextInt;
+
+  for (int i = 0; i < hexString.length(); i++) {
+
+    nextInt = int(hexString.charAt(i));
+    if (nextInt >= 48 && nextInt <= 57) nextInt = map(nextInt, 48, 57, 0, 9);
+    if (nextInt >= 65 && nextInt <= 70) nextInt = map(nextInt, 65, 70, 10, 15);
+    if (nextInt >= 97 && nextInt <= 102) nextInt = map(nextInt, 97, 102, 10, 15);
+    nextInt = constrain(nextInt, 0, 15);
+
+    decValue = (decValue * 16) + nextInt;
+  }
+
+  return decValue;
 }
 
 void onEvent (ev_t ev) 
@@ -214,31 +235,36 @@ void onEvent (ev_t ev)
             display.drawString(0,1,"EV_TXCOMPLETE");
             if (LMIC.dataLen) 
             {
-              if (LMIC.dataLen == 1) 
-              {
-                uint8_t result = LMIC.frame[LMIC.dataBeg + 0];
-                if (result == 48)  
-                {
-                  display.drawString(0,2,"RESETTING");
-                  display.drawString(0,3,"NAVIGATION");
-                  restartNavigationSystem();
-                  display.drawString(0,4,"RESETTING");
-                  display.drawString(0,5,"MOBILE TERMINAL");
-                  restartMobileTerminal();
-                }              
-                if (result == 49)  
-                {
-                  display.drawString(0,2,"RESETTING");
-                  display.drawString(0,3,"MOBILE TERMINAL");
-                  restartMobileTerminal();                 
-                } 
-                if (result == 50)  
-                {
-                  display.drawString(0,2,"RESETTING");
-                  display.drawString(0,3,"NAVIGATION");
-                  restartNavigationSystem();               
-                }                                      
-              }
+                //Storing the hex in a variable
+                for (int i = 0; i < LMIC.dataLen; i++) {
+                   HexDownlink += String(LMIC.frame[LMIC.dataBeg + i], HEX);
+                }
+
+                  if (hexToDec(HexDownlink) == 48)  
+                  {
+                    display.drawString(0,2,"RESETTING");
+                    display.drawString(0,3,"NAVIGATION");
+                    restartNavigationSystem();
+                    display.drawString(0,4,"RESETTING");
+                    display.drawString(0,5,"MOBILE TERMINAL");
+                    restartMobileTerminal();
+                  }              
+                           
+                  if (hexToDec(HexDownlink) == 49) 
+                  {
+                    display.drawString(0,2,"RESETTING");
+                    display.drawString(0,3,"MOBILE TERMINAL");
+                    restartMobileTerminal();                 
+                  } 
+                  
+                  if (hexToDec(HexDownlink) == 50)  
+                  {
+                    display.drawString(0,2,"RESETTING");
+                    display.drawString(0,3,"NAVIGATION");
+                    restartNavigationSystem();               
+                  }  
+                  
+                  HexDownlink = "";
             }
             // Schedule next transmission
             os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
