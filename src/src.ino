@@ -137,13 +137,13 @@ double getTemperature(DeviceAddress deviceAddress)
 double getBatteryVoltage() 
 {
   //Multiply the analog value by the number of millivolts per tick 
-  float voltage = twoHundredAndFifty() * 0.0063492063492063;
+  float voltage = getTwoHundredAndFiftyVoltageReadings() * 0.0063492063492063;
   
   // return the value
   return voltage;
 }
 
-float twoHundredAndFifty()
+float getTwoHundredAndFiftyVoltageReadings()
 {
   int sumOfSensorValue = 0.0;
   for(int i = 0; i < 250; i++)
